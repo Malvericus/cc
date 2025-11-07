@@ -1,0 +1,555 @@
+////////////Assignment 1//////////=====Write a lex program to count the number of comments, keywords, identifiers, words, lines, and spaces from input file==================
+
+flex count_analysis.l        # Step 1: Generate lex.yy.c from your Lex file
+gcc lex.yy.c -o count_analysis -lfl   # Step 2: Compile and link with the flex library
+./count_analysis input.txt    # Step 3: Run it with input.txt as input
+
+///input.txt/////
+int main() {
+    int a = 10;
+    float b = 20.5;
+    if (a < b)
+        a = a + 1;
+    return 0;
+}
+
+
+
+%{
+#include <stdio.h>
+#include <string.h>
+
+int comment_count = 0, keyword_count = 0, identifier_count = 0;
+int word_count = 0, line_count = 0, space_count = 0;
+
+char *keywords[] = {
+    "if","else","while","for","do","break","int","float","return","char","double","continue","void",
+    NULL
+};
+
+int is_keyword(char *str) {
+    int i = 0;
+    while(keywords[i]) {
+        if(strcmp(str, keywords[i]) == 0)
+            return 1;
+        i++;
+    }
+    return 0;
+}
+%}
+
+%option noyywrap
+
+%%
+
+"//".*              { comment_count++; }
+"/*"([^*]|\*+[^*/])*\*+"/" { comment_count++; } // multi-line comments
+[ \t]+              { space_count += yyleng; }
+\n                  { line_count++; }
+[a-zA-Z_][a-zA-Z0-9_]*   {
+                           word_count++;
+                           if(is_keyword(yytext)) keyword_count++;
+                           else identifier_count++;
+                        }
+.                   ; // ignore other chars
+
+%%
+
+int main(int argc, char **argv) {
+    FILE *in = NULL;
+    if(argc > 1) in = fopen(argv[1], "r");
+    if(!in) in = stdin;
+    yyin = in;
+
+    yylex();
+
+    printf("Lines: %d\n", line_count);
+    printf("Spaces: %d\n", space_count);
+    printf("Words: %d\n", word_count);
+    printf("Keywords: %d\n", keyword_count);
+    printf("Identifiers: %d\n", identifier_count);
+    printf("Comments: %d\n", comment_count);
+
+    if(in && in != stdin) fclose(in);
+    return 0;
+}
+
+
+1. Decimal to Hexadecimal
+
+%{
+#include <stdio.h>
+#include <stdlib.h>
+%}
+
+%%
+[0-9]+ {
+    int num = atoi(yytext);
+    printf("Hexadecimal of %d = %X\n", num, num);
+}
+.|\n  { ECHO; }
+%%
+
+int main(int argc, char *argv[]) {
+    FILE *inFile;
+
+    if (argc != 2) {
+        printf("Usage: %s <input_file>\n", argv[0]);
+        return 1;
+    }
+
+    inFile = fopen(argv[1], "r");
+    if (!inFile) {
+        perror("Error opening input file");
+        return 1;
+    }
+
+    yyin = inFile;
+    yylex();
+
+    fclose(inFile);
+    return 0;
+}
+
+int yywrap() {
+    return 1;
+}
+
+INPUT.txt:
+The numbers are:
+10 15 255 1024
+
+
+2. Decimal to Binary
+
+%{
+#include <stdio.h>
+#include <stdlib.h>
+
+void dec_to_bin(int n) {
+    int binary[32], i = 0;
+    while(n > 0) {
+        binary[i++] = n % 2;
+        n /= 2;
+    }
+    for(int j = i - 1; j >= 0; j--)
+        printf("%d", binary[j]);
+}
+%}
+
+%%
+[0-9]+ {
+    int num = atoi(yytext);
+    printf("Binary of %d = ", num);
+    dec_to_bin(num);
+    printf("\n");
+}
+.|\n { ECHO; }
+%%
+
+int main() {
+    yylex();
+    return 0;
+}
+
+int yywrap() {
+    return 1;
+}
+
+3. Hexadecimal to Decimal
+
+%{
+#include <stdio.h>
+#include <stdlib.h>
+%}
+
+%%
+0[xX][0-9a-fA-F]+ {
+    int num = (int)strtol(yytext, NULL, 16);
+    printf("Decimal of %s = %d\n", yytext, num);
+}
+.|\n { ECHO; }
+%%
+
+int main(int argc, char *argv[]) {
+    FILE *inFile;
+
+    if (argc != 2) {
+        printf("Usage: %s <input_file>\n", argv[0]);
+        return 1;
+    }
+
+    inFile = fopen(argv[1], "r");
+    if (!inFile) {
+        perror("Error opening input file");
+        return 1;
+    }
+
+    yyin = inFile;
+    yylex();
+
+    fclose(inFile);
+    return 0;
+}
+
+int yywrap() {
+    return 1;
+}
+
+INPUT:
+Hex values: 0xFF 0x1A 0xABC
+More numbers: 0x10 0x7F
+
+
+1. YACC program for Conversion of Infix to Postfix expression.
+
+infix_postfix.l
+
+
+%{
+#include "infix_postfix.tab.h"
+#include <stdlib.h>
+%}
+
+%%
+[0-9]+              { yylval = atoi(yytext); return NUM; }
+[+\-*/^()]          { return yytext[0]; }
+[ \t\n]             { /* skip whitespace */ }
+.                   { printf("Invalid character: %s\n", yytext); }
+%%
+
+int yywrap() { return 1; }
+
+
+
+infix_postfix.y
+
+
+%{
+#include <stdio.h>
+#include <stdlib.h>
+%}
+
+%token NUM
+%left '+' '-'
+%left '*' '/'
+%right '^'
+%nonassoc '(' ')'
+
+%%
+E : E '+' E     { printf("+ "); }
+  | E '-' E     { printf("- "); }
+  | E '*' E     { printf("* "); }
+  | E '/' E     { printf("/ "); }
+  | '(' E ')'   { }
+  | NUM         { printf("%d ", $1); }
+  ;
+%%
+
+int main() {
+    printf("Enter infix expression: ");
+    yyparse();
+    printf("\n");
+    return 0;
+}
+
+int yyerror(const char *s) {
+    printf("Error: %s\n", s);
+    return 0;
+}
+
+
+
+sudo apt update
+sudo apt install flex bison gcc
+
+bison -d postfix_eval.y
+flex postfix_eval.l
+gcc postfix_eval.tab.c lex.yy.c -o postfix_eval -lfl -lm
+./postfix_eval
+
+
+
+
+2. YACC program for valuating Postfix expressions containing Decimal numbers.
+
+ 
+postfix_eval.l
+
+
+
+%{
+#include "postfix_eval.tab.h"
+#include <stdlib.h>
+%}
+
+%%
+
+[0-9]+(\.[0-9]+)?     { yylval.fval = atof(yytext); return NUM; }   /* Match integers or decimals */
+[+\-*/\n]              { return yytext[0]; }                         /* Operators and newline */
+[ \t]                  ;                                              /* Ignore spaces and tabs */
+
+.                      { printf("Invalid character: %s\n", yytext); }
+
+%%
+
+int yywrap() { return 1; }
+
+
+
+
+postfix_eval.y
+
+
+%{
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+
+int yylex();
+int yyerror(char *s);
+%}
+
+%union {
+    double fval;
+}
+
+%token <fval> NUM
+%type <fval> E
+
+%%
+
+input:
+    /* empty */
+  | input line
+  ;
+
+line:
+    E '\n'   { printf("Result = %.2f\n", $1); }
+  ;
+
+E:
+    E E '+'  { $$ = $1 + $2; }
+  | E E '-'  { $$ = $1 - $2; }
+  | E E '*'  { $$ = $1 * $2; }
+  | E E '/'  {
+                if ($2 == 0) {
+                    printf("Error: Division by zero\n");
+                    $$ = 0;
+                } else $$ = $1 / $2;
+              }
+  | NUM      { $$ = $1; }
+  ;
+
+%%
+
+int main() {
+    printf("Enter postfix expression (e.g. 3 4 + 2 *):\n");
+    yyparse();
+    return 0;
+}
+
+int yyerror(char *s) {
+    printf("Error: %s\n", s);
+    return 0;
+}
+
+INPUT:
+3 4 + 2 *
+
+
+3. YACC program for IC generation for the expression involving parenthesis.
+
+
+expr_ic.l
+
+%{
+#include "expr_ic.tab.h"
+#include <string.h>
+%}
+
+%%
+[0-9]+              { yylval.str = strdup(yytext); return NUM; }
+[a-zA-Z][a-zA-Z0-9]* { yylval.str = strdup(yytext); return ID; }
+[+\-*/()=]          { return yytext[0]; }
+[ \t\n]             ;
+.                   { printf("Invalid character: %s\n", yytext); }
+%%
+
+int yywrap() { return 1; }
+
+
+expr_ic.y
+
+
+%{
+#include <stdio.h>
+#include <stdlib.h>
+
+int tempCount = 1;
+char temp[10];
+
+void newTemp() {
+    sprintf(temp, "t%d", tempCount++);
+}
+
+int yylex();
+int yyerror(char *s);
+%}
+
+%token ID NUM
+
+%left '+' '-'
+%left '*' '/'
+%left '(' ')'
+
+%%
+S : E { printf("Final Result in %s\n", temp); }
+  ;
+
+E : E '+' T  { newTemp(); printf("%s = %s + %s\n", temp, $1, $3); $$ = strdup(temp); }
+  | E '-' T  { newTemp(); printf("%s = %s - %s\n", temp, $1, $3); $$ = strdup(temp); }
+  | T        { $$ = $1; }
+  ;
+
+T : T '*' F  { newTemp(); printf("%s = %s * %s\n", temp, $1, $3); $$ = strdup(temp); }
+  | T '/' F  { newTemp(); printf("%s = %s / %s\n", temp, $1, $3); $$ = strdup(temp); }
+  | F        { $$ = $1; }
+  ;
+
+F : '(' E ')' { $$ = $2; }
+  | ID        { $$ = strdup(yytext); }
+  | NUM       { $$ = strdup(yytext); }
+  ;
+%%
+
+int yyerror(char *s) {
+    printf("Error: %s\n", s);
+    return 0;
+}
+
+int main() {
+    printf("Enter expression: ");
+    yyparse();
+    return 0;
+}
+
+
+INPUT:
+a = (b + c) * d
+
+
+
+4. YACC program for IC generation for the expression involving programming constructs.
+
+construct_ic.y
+
+
+
+%{
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+int yylex();
+void yyerror(const char *s);
+extern char *yytext;
+
+char tempVar[10];
+int tempCount = 0;
+
+void newTemp() {
+    sprintf(tempVar, "t%d", tempCount++);
+}
+%}
+
+%union {
+    char *str;
+}
+
+%token <str> ID NUM RELOP
+%token IF ELSE WHILE
+%type <str> E T F C
+
+%nonassoc LOWER_THAN_ELSE
+%nonassoc ELSE
+
+%%
+
+S : STMT
+  ;
+
+STMT : C ';'                        { printf("Condition Result: %s\n", $1); }
+     | ID '=' E ';'                 { newTemp(); printf("%s = %s\n", $1, $3); }
+     | IF '(' C ')' STMT %prec LOWER_THAN_ELSE
+                                    { printf("if %s goto true_label\n", $3); }
+     | IF '(' C ')' STMT ELSE STMT  { printf("if %s goto true_label else false_label\n", $3); }
+     | WHILE '(' C ')' STMT         { printf("while %s loop\n", $3); }
+     | '{' STMT_LIST '}'            { }
+     ;
+
+STMT_LIST : STMT_LIST STMT
+          | STMT
+          ;
+
+C : E RELOP E                       { newTemp(); printf("%s = %s %s %s\n", tempVar, $1, $2, $3); $$ = strdup(tempVar); }
+  ;
+
+E : E '+' T                         { newTemp(); printf("%s = %s + %s\n", tempVar, $1, $3); $$ = strdup(tempVar); }
+  | E '-' T                         { newTemp(); printf("%s = %s - %s\n", tempVar, $1, $3); $$ = strdup(tempVar); }
+  | T                               { $$ = $1; }
+  ;
+
+T : T '*' F                         { newTemp(); printf("%s = %s * %s\n", tempVar, $1, $3); $$ = strdup(tempVar); }
+  | T '/' F                         { newTemp(); printf("%s = %s / %s\n", tempVar, $1, $3); $$ = strdup(tempVar); }
+  | F                               { $$ = $1; }
+  ;
+
+F : '(' E ')'                       { $$ = $2; }
+  | ID                              { $$ = $1; }
+  | NUM                             { $$ = $1; }
+  ;
+
+%%
+
+void yyerror(const char *s) {
+    fprintf(stderr, "Error: %s\n", s);
+}
+
+int main() {
+    printf("Enter an expression or construct:\n");
+    yyparse();
+    return 0;
+}
+
+
+
+construct_ic.l
+
+
+%{
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include "construct_ic.tab.h"
+%}
+
+%%
+
+"if"                        { return IF; }
+"else"                      { return ELSE; }
+"while"                     { return WHILE; }
+[0-9]+                      { yylval.str = strdup(yytext); return NUM; }
+[a-zA-Z_][a-zA-Z0-9_]*      { yylval.str = strdup(yytext); return ID; }
+">="|"<="|"=="|"!="|">"|"<" { yylval.str = strdup(yytext); return RELOP; }
+"("                         { return '('; }
+")"                         { return ')'; }
+"{"                         { return '{'; }
+"}"                         { return '}'; }
+[+\-*/=;]                   { return yytext[0]; }
+[ \t\n\r]                   ;  /* ignore whitespace */
+.                           { printf("Unknown character: %s\n", yytext); }
+
+%%
+
+int yywrap() { return 1; }
